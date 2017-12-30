@@ -119,20 +119,7 @@
 #include <crypt.h>
 #endif
 
-#ifndef HAVE_OPENSSL
-#ifdef HAVE_MD5_H
-#include <md5.h>
-#endif
-
-#if defined(HAVE_SASL_MD5_H) && (defined(HAVE_CYRUS_SASL_V1) || defined(HAVE_CYRUS_SASL_V2))
-#define USE_SASL_MD5
-#include <md5global.h>
-#include <md5.h>
-#endif
-#endif
-
 #ifdef HAVE_OPENSSL
-#include <openssl/md5.h>
 #include <openssl/sha.h>
 #endif
 
@@ -549,57 +536,6 @@ static void *memcspn(void *buf, size_t buf_len, const unsigned char *delims,
 }
 /* }}} */
 
-/* {{{ pam_mysql_md5_data
- *
- * AFAIK, only FreeBSD has MD5Data() defined in md5.h
- * better MD5 support will appear in 0.5
- */
-#ifdef HAVE_MD5DATA
-#define HAVE_PAM_MYSQL_MD5_DATA
-#define pam_mysql_md5_data MD5Data
-#elif defined(HAVE_OPENSSL) || (defined(HAVE_SASL_MD5_H) && defined(USE_SASL_MD5)) || (!defined(HAVE_OPENSSL) && defined(HAVE_SOLARIS_MD5))
-#if defined(USE_SASL_MD5)
-static unsigned char *MD5(const unsigned char *d, unsigned int n,
-		unsigned char *md)
-{
-	MD5_CTX ctx;
-
-	_sasl_MD5Init(&ctx);
-
-	_sasl_MD5Update(&ctx, (unsigned char *)d, n);
-
-	_sasl_MD5Final(md, &ctx);
-
-	return md;
-}
-#elif defined(USE_SOLARIS_MD5)
-#define MD5(d, n, md) md5_calc(d, md, n)
-#endif
-#define HAVE_PAM_MYSQL_MD5_DATA
-static char *pam_mysql_md5_data(const unsigned char *d, unsigned int sz, char *md)
-{
-	size_t i, j;
-	unsigned char buf[16];
-
-	if (md == NULL) {
-		if ((md = xcalloc(32 + 1, sizeof(char))) == NULL) {
-			return NULL;
-		}
-	}
-
-	MD5(d, (unsigned long)sz, buf);
-
-	for (i = 0, j = 0; i < 16; i++, j += 2) {
-		md[j + 0] = "0123456789abcdef"[(int)(buf[i] >> 4)];
-		md[j + 1] = "0123456789abcdef"[(int)(buf[i] & 0x0f)];
-	}
-	md[j] = '\0';
-
-	return md;
-}
-#endif
-/* }}} */
-
 /* {{{ pam_mysql_sha1_data */
 #if defined(HAVE_OPENSSL)
 #define HAVE_PAM_MYSQL_SHA1_DATA
@@ -693,10 +629,6 @@ static pam_mysql_err_t pam_mysql_crypt_opt_getter(void *val, const char **pretva
 			*pretval = "mysql";
 			break;
 
-		case 3:
-			*pretval = "md5";
-			break;
-
 		case 4:
 			*pretval = "sha1";
 			break;
@@ -728,10 +660,6 @@ static pam_mysql_err_t pam_mysql_crypt_opt_setter(void *val, const char *newval_
 		*(int *)val = 2;
 		return PAM_MYSQL_ERR_SUCCESS;
 	}
-	if (strcmp(newval_str, "3") == 0 || strcasecmp(newval_str, "md5") == 0) {
-		*(int *)val = 3;
-		return PAM_MYSQL_ERR_SUCCESS;
-	}
 	if (strcmp(newval_str, "4") == 0 || strcasecmp(newval_str, "sha1") == 0) {
 		*(int *)val = 4;
 		return PAM_MYSQL_ERR_SUCCESS;
@@ -750,10 +678,6 @@ static pam_mysql_err_t pam_mysql_method_opt_getter(void *val, const char **pretv
 	switch (*(int *)val) {
 		case 0:
 			*pretval = "des";
-			break;
-
-		case 1:
-			*pretval = "md5";
 			break;
 
 		case 2:
@@ -783,11 +707,6 @@ static pam_mysql_err_t pam_mysql_method_opt_setter(void *val, const char *newval
 {
 	if (strcmp(newval_str, "0") == 0 || strcasecmp(newval_str, "des") == 0) {
 		*(int *)val = 0;
-		return PAM_MYSQL_ERR_SUCCESS;
-	}
-
-	if (strcmp(newval_str, "1") == 0 || strcasecmp(newval_str, "md5") == 0) {
-		*(int *)val = 1;
 		return PAM_MYSQL_ERR_SUCCESS;
 	}
 
@@ -2754,22 +2673,6 @@ static pam_mysql_err_t pam_mysql_check_passwd(pam_mysql_ctx_t *ctx,
 					}
 				} break;
 
-				/* MD5 hash (not MD5 crypt()) */
-				case 3: {
-#ifdef HAVE_PAM_MYSQL_MD5_DATA
-					char buf[33];
-					pam_mysql_md5_data((unsigned char*)passwd, strlen(passwd),
-							buf);
-					vresult = strcmp(row[0], buf);
-					{
-						char *p = buf - 1;
-						while (*(++p)) *p = '\0';
-					}
-#else
-					syslog(LOG_AUTHPRIV | LOG_ERR, PAM_MYSQL_LOG_PREFIX "non-crypt()ish MD5 hash is not supported in this build.");
-#endif
-				} break;
-
 				case 4: {
 #ifdef HAVE_PAM_MYSQL_SHA1_DATA
 					char buf[41];
@@ -2958,22 +2861,6 @@ static pam_mysql_err_t pam_mysql_update_passwd(pam_mysql_ctx_t *ctx, const char 
 				}
 #else
 				my_make_scrambled_password(encrypted_passwd, new_passwd, strlen(new_passwd));
-#endif
-				break;
-
-			case 3:
-#ifdef HAVE_PAM_MYSQL_MD5_DATA
-				if (NULL == (encrypted_passwd = xcalloc(32 + 1, sizeof(char)))) {
-					syslog(LOG_AUTHPRIV | LOG_CRIT, PAM_MYSQL_LOG_PREFIX "allocation failure at " __FILE__ ":%d", __LINE__);
-					err = PAM_MYSQL_ERR_ALLOC;
-					goto out;
-				}
-				pam_mysql_md5_data((unsigned char*)new_passwd,
-						strlen(new_passwd), encrypted_passwd);
-#else
-				syslog(LOG_AUTHPRIV | LOG_ERR, PAM_MYSQL_LOG_PREFIX "non-crypt()ish MD5 hash is not supported in this build.");
-				err = PAM_MYSQL_ERR_NOTIMPL;
-				goto out;
 #endif
 				break;
 
