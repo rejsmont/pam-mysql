@@ -2957,7 +2957,7 @@ static pam_mysql_err_t pam_mysql_update_passwd(pam_mysql_ctx_t *ctx, const char 
 					make_scrambled_password(encrypted_passwd, new_passwd);
 				}
 #else
-				my_make_scrambled_password(buf, passwd, strlen(passwd));
+				my_make_scrambled_password(encrypted_passwd, new_passwd, strlen(new_passwd));
 #endif
 				break;
 
