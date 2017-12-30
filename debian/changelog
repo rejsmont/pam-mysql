@@ -1,3 +1,9 @@
+pam-mysql (0.8) xenial; urgency=medium
+
+  * New version 0.8 with enhanced crypt support.
+
+ -- Radoslaw Ejsmont <radoslaw@ejsmont.net>  Sat, 30 Dec 2017 19:27:46 +0000
+
 pam-mysql (0.7~RC1-4ubuntu2) xenial; urgency=medium
 
   * Rebuild against libmysqlclient20.
@@ -41,7 +47,7 @@ pam-mysql (0.7~RC1-3) experimental; urgency=low
 
   * debconf
   * more cleanup
-  * added -f switch to rm in rules (closes: #490772) 
+  * added -f switch to rm in rules (closes: #490772)
   * New version fixes bugs (closes: #367535, #368653, #238478)
 
  -- Lars Bahner <bahner@debian.org>  Mon, 26 Jan 2009 08:36:06 +0100
@@ -144,7 +150,7 @@ pam-mysql (0.4.7-0.1) unstable; urgency=medium
 
 pam-mysql (0.2) unstable; urgency=low
 
-  * NMU: Recompiled against libmysqlclient10. Closes: #97616 
+  * NMU: Recompiled against libmysqlclient10. Closes: #97616
 
  -- Christian Hammers <ch@debian.org>  Sat, 19 May 2001 18:40:08 +0200
 

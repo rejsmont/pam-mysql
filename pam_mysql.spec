@@ -1,6 +1,6 @@
 Summary: A PAM-module for authentication against MySQL
 Name: pam_mysql
-Version: 0.7RC1
+Version: 0.8
 Release: 1
 Copyright: Freely Distributable
 Group: System Environment/Base

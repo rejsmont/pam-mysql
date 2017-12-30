@@ -1,3 +1,8 @@
+2017-12-30  Radoslaw Ejsmont  <radoslaw@ejsmont.net>
+
+	* pam_mysql.c: replaced md5 option with method option, added support for
+	modern hashing methods supported by crypt(3). Applied Fedora patches.
+
 2006-01-09  Moriyoshi Koizumi  <moriyoshi@users.sourceforge.net>
 
 	* pam_mysql.c: PR #1325395 - add "disconnect_every_op" option that forces
