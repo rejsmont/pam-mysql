@@ -2626,6 +2626,23 @@ out:
 }
 /* }}} */
 
+void my_make_scrambled_password(char *to, const char *password,
+	                              size_t pass_len);
+
+void my_make_scrambled_password(char *to, const char *password,
+	                              size_t pass_len)
+{
+	int i = 0;
+	unsigned char temp[SHA_DIGEST_LENGTH];
+	memset(temp, 0x0, SHA_DIGEST_LENGTH);
+	memset(to,   0x0, SHA_DIGEST_LENGTH*2);
+
+	SHA1(password, pass_len, temp);
+	for (i=0; i < SHA_DIGEST_LENGTH; i++) {
+	        sprintf((char*)(to+(i*2)), "%02x", temp[i]);
+	}
+}
+
 /* {{{ pam_mysql_check_passwd
  */
 static pam_mysql_err_t pam_mysql_check_passwd(pam_mysql_ctx_t *ctx,
@@ -2727,7 +2744,7 @@ static pam_mysql_err_t pam_mysql_check_passwd(pam_mysql_ctx_t *ctx,
 						make_scrambled_password(buf, passwd);
 					}
 #else
-					make_scrambled_password(buf, passwd);
+					my_make_scrambled_password(buf, passwd, strlen(passwd));
 #endif
 
 					vresult = strcmp(row[0], buf);
@@ -3299,7 +3316,7 @@ static pam_mysql_err_t pam_mysql_converse(pam_mysql_ctx_t *ctx, char ***pretval,
 	}
 
 	for (i = 0; i < nargs; i++) {
-		if (resps[i].resp != NULL &&
+		if (resps != NULL && resps[i].resp != NULL &&
 				NULL == (retval[i] = xstrdup(resps[i].resp))) {
 			syslog(LOG_AUTHPRIV | LOG_CRIT, PAM_MYSQL_LOG_PREFIX "allocation failure at " __FILE__ ":%d", __LINE__);
 			err = PAM_MYSQL_ERR_ALLOC;
@@ -3447,7 +3464,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t * pamh, int flags,
 
 			case PAM_NO_MODULE_DATA:
 				passwd = NULL;
-				break;
+				goto askpass;
 
 			default:
 				retval = PAM_AUTH_ERR;
@@ -3513,6 +3530,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t * pamh, int flags,
 		}
 	}
 
+askpass:
 	switch (pam_mysql_converse(ctx, &resps, pamh, 1,
 			PAM_PROMPT_ECHO_OFF, PLEASE_ENTER_PASSWORD)) {
 		case PAM_MYSQL_ERR_SUCCESS:
@@ -3540,6 +3558,10 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t * pamh, int flags,
 		goto out;
 	}
 
+	if (passwd_is_local) {
+		(void) pam_set_item(pamh, PAM_AUTHTOK, passwd);
+	}
+
 	switch (pam_mysql_open_db(ctx)) {
 		case PAM_MYSQL_ERR_BUSY:
 		case PAM_MYSQL_ERR_SUCCESS:
@@ -3556,10 +3578,6 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t * pamh, int flags,
 		default:
 			retval = PAM_SERVICE_ERR;
 			goto out;
-	}
-
-	if (passwd_is_local) {
-		(void) pam_set_item(pamh, PAM_AUTHTOK, passwd);
 	}
 
 	err = pam_mysql_check_passwd(ctx, user, passwd,
